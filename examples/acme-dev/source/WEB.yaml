@@ -1,0 +1,5 @@
+class: tracker:class:Project
+title: Web
+identifier: WEB
+description: Customer-facing web app
+defaultIssueStatus: Backlog

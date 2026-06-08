@@ -1,0 +1,4 @@
+firstName,lastName,email,city,employee,department
+Jane,Doe,jane.doe@acme.example,New York,true,Frontend
+John,Roe,john.roe@acme.example,Austin,true,Platform
+Mia,Lee,mia.lee@acme.example,,false,

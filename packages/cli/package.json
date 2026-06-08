@@ -1,0 +1,23 @@
+{
+  "name": "@huly-data-xport/cli",
+  "version": "0.1.0",
+  "description": "Command-line surface over @huly-data-xport/core: prepare, validate, import, verify, export, report.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "huly-data-xport": "./dist/index.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc --build",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo",
+    "test": "node --test dist/util.test.js"
+  },
+  "dependencies": {
+    "@huly-data-xport/core": "0.1.0",
+    "commander": "^12.1.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

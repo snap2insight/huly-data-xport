@@ -1,0 +1,4 @@
+class: tracker:class:Project
+title: Web
+identifier: WEB
+defaultIssueStatus: Backlog

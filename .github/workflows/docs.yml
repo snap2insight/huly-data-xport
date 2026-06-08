@@ -1,0 +1,129 @@
+# Build the docs/ MyST site and publish it to GitHub Pages on every push to
+# main that touches the docs (or the build wiring).
+#
+# The theme + CSS + mermaid plugin come from the public myst-docs-toolkit,
+# fetched at build time into docs/_toolkit/ (gitignored — never committed).
+# All build logic lives in the Justfile (recipe: `ci-docs`), so the same
+# command runs locally and in CI.
+
+name: Docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "Justfile"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  TOOLKIT_REPO: "snap2insight/myst-docs-toolkit"
+  TOOLKIT_REF:  "main"
+  # Opt JS actions into Node 24 (configure-pages@v5 still declares Node 20).
+  # https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  NPM_CONFIG_PREFIX: /home/runner/.npm-global
+
+jobs:
+  build:
+    name: Build docs site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Fetch docs toolkit (public)
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ env.TOOLKIT_REPO }}
+          ref:        ${{ env.TOOLKIT_REF }}
+          path:       docs/_toolkit
+          submodules: true            # toolkit vendors book-theme as a submodule
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v6
+      - uses: extractions/setup-just@v3
+
+      - name: Configure npm prefix + PATH
+        run: |
+          mkdir -p "$NPM_CONFIG_PREFIX/bin"
+          npm config set prefix "$NPM_CONFIG_PREFIX"
+          echo "$NPM_CONFIG_PREFIX/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Python venv
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: ${{ runner.os }}-venv-${{ hashFiles('docs/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-venv-
+
+      - name: Cache npm globals + tarball cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            /home/runner/.npm-global
+            /home/runner/.npm
+          key: ${{ runner.os }}-npm-docs-${{ hashFiles('Justfile') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-docs-
+
+      - name: Install build deps
+        run: just node-deps python-deps
+
+      - name: Resolve BASE_URL from the Pages serving URL
+        id: base
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Public Pages → https://<org>.github.io/<repo>/  → BASE_URL=/<repo>
+          # Private Pages → https://<random>.pages.github.io/ → BASE_URL=""
+          PAGES_URL=$(gh api repos/${{ github.repository }}/pages --jq '.html_url' 2>/dev/null || echo "")
+          BASE_PATH=$(printf '%s' "$PAGES_URL" | sed -E 's|^https?://[^/]+||;s|/$||')
+          echo "Pages URL: $PAGES_URL"
+          echo "BASE_URL:  $BASE_PATH"
+          echo "BASE_URL=$BASE_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Build (just ci-docs)
+        env:
+          BASE_URL: ${{ steps.base.outputs.BASE_URL }}
+        run: just ci-docs
+
+      - name: Finalize for static hosting
+        # Add .nojekyll so GH Pages doesn't strip MyST's _static/_sources.
+        run: touch docs/_build/html/.nojekyll
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: "docs/_build/html"
+
+  deploy:
+    name: Deploy
+    needs: build
+    if: ${{ always() && needs.build.result == 'success' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

@@ -1,0 +1,6 @@
+class: core:class:Enum
+title: Tier
+values:
+  - Free
+  - Pro
+  - Enterprise

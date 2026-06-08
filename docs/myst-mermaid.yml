@@ -1,0 +1,12 @@
+# myst-mermaid plugin config. Read by _toolkit/plugins/myst-mermaid/plugin.py
+# at build time. Emits each diagram as a light + dark variant pair; the
+# toolkit CSS shows whichever matches the active color scheme.
+dual_render: true
+theme: neutral
+fontFamily: "system-ui, -apple-system, sans-serif"
+themeVariables:
+  fontFamily: "system-ui, -apple-system, sans-serif"
+  fontSize: "14px"
+logLevel: fatal
+darkMode: false
+markdownAutoWrap: true

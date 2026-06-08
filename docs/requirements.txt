@@ -1,0 +1,6 @@
+# Python deps for building the docs site.
+# Installed into .venv/ by `just python-deps` (uv-managed).
+
+# myst-mermaid plugin runtime (from the vendored myst-docs-toolkit)
+pyyaml
+jsonschema

@@ -1,0 +1,23 @@
+# Node deps
+node_modules/
+# TypeScript build output
+packages/*/dist/
+**/*.tsbuildinfo
+# Python
+__pycache__/
+*.pyc
+.venv/
+# Build artifacts — regenerable; per content/example dir
+_build/
+docs/_build/
+examples/*/_build/
+# Vendored at build time from the external docs toolkit (never commit).
+# Local devs symlink it; CI fetches it into docs/_toolkit.
+docs/_toolkit
+# Credentials — never commit
+.env
+.envrc
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
