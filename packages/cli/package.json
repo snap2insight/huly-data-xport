@@ -14,7 +14,7 @@
     "test": "node --test dist/util.test.js"
   },
   "dependencies": {
-    "@huly-data-xport/core": "0.1.1",
+    "@huly-data-xport/core": "0.2.0",
     "commander": "^12.1.0"
   },
   "engines": {
