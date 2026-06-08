@@ -20,6 +20,7 @@ import {
   resolveWorkspace,
   deleteWorkspace,
   inviteToWorkspace,
+  planInvites,
   reconcilePeople,
   verifyWorkspace,
   consoleLogger,
@@ -325,34 +326,23 @@ contentOpts(program.command('invite'))
     const tgts = targets(opts)            // resolves content + loads .env
     const creds = hulyCreds()
     const logger = consoleLogger(opts.verbose === true)
-    const norm = (s: string): string => s.trim().toLowerCase()
-    const split = (s?: string): string[] => (s == null ? [] : s.split(',').map(norm).filter((x) => x.length > 0))
-    const defaultRole = String(opts.role).toUpperCase()
+    const split = (s?: string): string[] => (s == null ? [] : s.split(',').map((x) => x.trim()).filter((x) => x.length > 0))
     let anyFailed = false
 
     for (const t of tgts) {
       console.log(`\n=== invite → ${t.name}${opts.send === true ? '' : '  (DRY-RUN — add --send to send)'} ===`)
       const ws = await parse(t.treeDir)
-      const byEmail = new Map((ws.people ?? []).filter((p) => p.email != null).map((p) => [norm(p.email as string), p]))
 
-      // Leads → MAINTAINER (from department lead emails, unless overridden).
-      const maintainers = new Set(
-        opts.maintainers != null
-          ? split(opts.maintainers)
-          : (ws.departments ?? []).map((d) => d.lead).filter((e): e is string => e != null).map(norm),
-      )
-
-      // Selection + order: explicit --people list, else everyone in file order.
-      const order = opts.people != null ? split(opts.people) : [...byEmail.keys()]
-      const people = order.map((email) => {
-        const p = byEmail.get(email)
-        if (p == null) logger.warn(`  ! ${email} not found in people.csv — inviting anyway`)
-        const role = maintainers.has(email) ? 'MAINTAINER' : defaultRole
-        const label = p != null ? `${p.firstName} ${p.lastName}` : email
-        return { email, role, label }
+      // Pure planning (order + role mapping) lives in core; the CLI just logs + sends.
+      const plan = planInvites(ws, {
+        people: opts.people != null ? split(opts.people) : undefined,
+        maintainers: opts.maintainers != null ? split(opts.maintainers) : undefined,
+        defaultRole: opts.role,
       })
+      for (const e of plan) if (!e.known) logger.warn(`  ! ${e.email} not found in people.csv — inviting anyway`)
 
-      if (people.length === 0) { console.log('  (no people to invite)'); continue }
+      if (plan.length === 0) { console.log('  (no people to invite)'); continue }
+      const people = plan.map(({ email, role, label }) => ({ email, role, label }))
       const outcomes = await inviteToWorkspace(t.name, people, creds, logger, opts.send === true, opts.resend === true)
       writeArtifact(t.buildDir, 'invites.json', outcomes)
       const by = (s: string): number => outcomes.filter((o) => o.status === s).length
