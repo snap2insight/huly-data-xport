@@ -8,6 +8,7 @@
 import type { ImportComment, ImportIssue, ImportProject } from '../model/entities.js'
 import { resolveMarkdown } from '../model/content.js'
 import { priorityToNumber } from '../model/classes.js'
+import { findOrCreate } from './find-or-create.js'
 import {
   chunter,
   combineName,
@@ -85,22 +86,43 @@ export class TrackerImporter {
   async applyLinks (): Promise<{ counts: ImportCounts, problems: string[] }> {
     const counts = zeroCounts()
     const problems: string[] = []
+    // Cache target lookups (many links share a target) and each source's
+    // current link-set (read once from live state, then maintained in memory)
+    // — avoids the O(links) target + source findOne the naive loop did, while
+    // keeping cross-run idempotency.
+    const targetById = new Map<string, Doc | null>()
+    const sourceSet = new Map<string, Set<string>>()
+
+    const resolveTarget = async (identifier: string): Promise<Doc | null> => {
+      const hit = targetById.get(identifier)
+      if (hit !== undefined) return hit
+      const t = (await this.client.findOne(tracker.class.Issue, { identifier })) ?? null
+      targetById.set(identifier, t)
+      return t
+    }
+    const linkSet = async (fromId: Ref, field: string): Promise<Set<string>> => {
+      const key = `${fromId}:${field}`
+      let set = sourceSet.get(key)
+      if (set == null) {
+        const fresh = await this.client.findOne(tracker.class.Issue, { _id: fromId })
+        set = new Set(((fresh?.[field] as Array<{ _id: Ref }> | undefined) ?? []).map((r) => String(r._id)))
+        sourceSet.set(key, set)
+      }
+      return set
+    }
+
     for (const link of this.pendingLinks) {
-      const target = await this.client.findOne(tracker.class.Issue, { identifier: link.target })
+      const target = await resolveTarget(link.target)
       if (target == null) {
         problems.push(`${link.fromIdentifier}: ${link.field} target ${link.target} not found`)
         continue
       }
-      const fresh = await this.client.findOne(tracker.class.Issue, { _id: link.fromId })
-      const existing = ((fresh?.[link.field] as Array<{ _id: Ref }> | undefined) ?? [])
-        .some((r) => r._id === target._id)
-      if (existing) {
-        counts.skipped++
-        continue
-      }
+      const set = await linkSet(link.fromId, link.field)
+      if (set.has(String(target._id))) { counts.skipped++; continue }
       await this.client.updateDoc(tracker.class.Issue, link.fromSpace, link.fromId, {
         $push: { [link.field]: { _id: target._id, _class: tracker.class.Issue } },
       })
+      set.add(String(target._id))
       this.logger.debug(`    ✓ ${link.fromIdentifier} ${link.field} → ${link.target}`)
       counts.updated++
     }
@@ -484,45 +506,29 @@ export class TrackerImporter {
   // ─── find-or-create helpers ──────────────────────────────────────────────
 
   private async findOrCreateComponent (live: Doc, label: string): Promise<Doc | null> {
-    const key = `${live._id}:${label}`
-    const cached = this.componentCache.get(key)
-    if (cached !== undefined) return cached
-    let c = await this.client.findOne(tracker.class.Component, { space: live._id, label })
-    if (c == null) {
-      const id = await this.client.createDoc(tracker.class.Component, live._id, { label, description: '', lead: null })
-      c = await this.client.findOne(tracker.class.Component, { _id: id })
-    }
-    this.componentCache.set(key, c ?? null)
-    return c ?? null
+    return findOrCreate(
+      this.client, this.componentCache, `${live._id}:${label}`,
+      tracker.class.Component, { space: live._id, label },
+      () => this.client.createDoc(tracker.class.Component, live._id, { label, description: '', lead: null }),
+    )
   }
 
   private async findOrCreateMilestone (live: Doc, label: string): Promise<Doc | null> {
-    const key = `${live._id}:${label}`
-    const cached = this.milestoneCache.get(key)
-    if (cached !== undefined) return cached
-    let m = await this.client.findOne(tracker.class.Milestone, { space: live._id, label })
-    if (m == null) {
-      const id = await this.client.createDoc(tracker.class.Milestone, live._id, {
-        label, description: '', status: 0, targetDate: 0, capacity: 0,
-      })
-      m = await this.client.findOne(tracker.class.Milestone, { _id: id })
-    }
-    this.milestoneCache.set(key, m ?? null)
-    return m ?? null
+    return findOrCreate(
+      this.client, this.milestoneCache, `${live._id}:${label}`,
+      tracker.class.Milestone, { space: live._id, label },
+      () => this.client.createDoc(tracker.class.Milestone, live._id, { label, description: '', status: 0, targetDate: 0, capacity: 0 }),
+    )
   }
 
   private async findOrCreateTag (title: string): Promise<Doc | null> {
-    const cached = this.tagCache.get(title)
-    if (cached !== undefined) return cached
-    let t = await this.client.findOne(tags.class.TagElement, { title, targetClass: tracker.class.Issue })
-    if (t == null) {
-      const id = await this.client.createDoc(tags.class.TagElement, this.tagSpace, {
+    return findOrCreate(
+      this.client, this.tagCache, title,
+      tags.class.TagElement, { title, targetClass: tracker.class.Issue },
+      () => this.client.createDoc(tags.class.TagElement, this.tagSpace, {
         title, description: '', color: hashColor(title), targetClass: tracker.class.Issue,
         category: tracker.category.Other, refCount: 0,
-      })
-      t = await this.client.findOne(tags.class.TagElement, { _id: id })
-    }
-    this.tagCache.set(title, t ?? null)
-    return t ?? null
+      }),
+    )
   }
 }
