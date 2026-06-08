@@ -27,6 +27,7 @@ import {
 } from '../huly/platform.js'
 import type { Logger } from './logger.js'
 import { type ImportCounts, zeroCounts } from './result.js'
+import { ensureDoc } from './find-or-create.js'
 
 const intl = (s: string): string => `embedded:embedded:${s}`
 
@@ -63,38 +64,23 @@ export class CardsImporter {
   // ─── Enums ───────────────────────────────────────────────────────────────
 
   private async ensureEnum (e: ImportEnum, counts: ImportCounts): Promise<void> {
-    const existing = await this.client.findOne(core.class.Enum, { name: e.title })
-    if (existing != null) {
-      this.enums.set(e.title, existing._id)
-      counts.skipped++
-      return
-    }
-    const id = generateId()
-    await this.client.createDoc(core.class.Enum, core.space.Model, { name: e.title, enumValues: e.values }, id)
+    const { id, created } = await ensureDoc(
+      this.client, counts, core.class.Enum, { name: e.title }, core.space.Model,
+      () => ({ name: e.title, enumValues: e.values }),
+    )
     this.enums.set(e.title, id)
-    counts.created++
-    this.logger.debug(`    ✓ created enum "${e.title}"`)
+    if (created) this.logger.debug(`    ✓ created enum "${e.title}"`)
   }
 
   // ─── MasterTags + attributes ───────────────────────────────────────────────
 
   private async ensureMasterTag (mt: ImportMasterTag, counts: ImportCounts): Promise<void> {
     const label = intl(mt.title)
-    let live = await this.client.findOne(card.class.MasterTag, { label })
-    let id: Ref
-    if (live != null) {
-      id = live._id
-      counts.skipped++
-    } else {
-      id = generateId()
-      await this.client.createDoc(
-        card.class.MasterTag, core.space.Model,
-        { extends: card.class.Card, label, kind: 0, icon: card.icon.MasterTag },
-        id,
-      )
-      counts.created++
-      this.logger.info(`  + created master tag "${mt.title}"`)
-    }
+    const { id, created } = await ensureDoc(
+      this.client, counts, card.class.MasterTag, { label }, core.space.Model,
+      () => ({ extends: card.class.Card, label, kind: 0, icon: card.icon.MasterTag }),
+    )
+    if (created) this.logger.info(`  + created master tag "${mt.title}"`)
     this.masterTags.set(mt.title, id)
     const attrs = await this.ensureAttributes(id, mt.properties ?? [], counts)
     this.attrsByTag.set(id, attrs)
@@ -102,21 +88,11 @@ export class CardsImporter {
 
   private async ensureCardTag (t: ImportCardTag, counts: ImportCounts): Promise<void> {
     const label = intl(t.title)
-    let live = await this.client.findOne(card.class.Tag, { label })
-    let id: Ref
-    if (live != null) {
-      id = live._id
-      counts.skipped++
-    } else {
-      id = generateId()
-      await this.client.createDoc(
-        card.class.Tag, core.space.Model,
-        { extends: card.class.Card, label, kind: 2, icon: card.icon.Tag },
-        id,
-      )
-      counts.created++
-      this.logger.debug(`    ✓ created card tag "${t.title}"`)
-    }
+    const { id, created } = await ensureDoc(
+      this.client, counts, card.class.Tag, { label }, core.space.Model,
+      () => ({ extends: card.class.Card, label, kind: 2, icon: card.icon.Tag }),
+    )
+    if (created) this.logger.debug(`    ✓ created card tag "${t.title}"`)
     const attrs = await this.ensureAttributes(id, t.properties ?? [], counts)
     this.tags.set(t.title, { id, attrs })
   }
@@ -255,13 +231,11 @@ export class CardsImporter {
       problems.push(`association ${a.nameA}/${a.nameB}: endpoint master tag not found`)
       return
     }
-    const existing = await this.client.findOne(core.class.Association, { classA, classB, nameA: a.nameA, nameB: a.nameB })
-    if (existing != null) { counts.skipped++; return }
-    await this.client.createDoc(
-      core.class.Association, core.space.Model,
-      { classA, classB, nameA: a.nameA, nameB: a.nameB, type: a.type },
+    const { created } = await ensureDoc(
+      this.client, counts, core.class.Association,
+      { classA, classB, nameA: a.nameA, nameB: a.nameB }, core.space.Model,
+      () => ({ classA, classB, nameA: a.nameA, nameB: a.nameB, type: a.type }),
     )
-    counts.created++
-    this.logger.debug(`    ✓ created association ${a.nameA}/${a.nameB}`)
+    if (created) this.logger.debug(`    ✓ created association ${a.nameA}/${a.nameB}`)
   }
 }

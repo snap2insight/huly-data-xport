@@ -8,6 +8,8 @@
 import type { ImportComment, ImportIssue, ImportProject } from '../model/entities.js'
 import { resolveMarkdown } from '../model/content.js'
 import { priorityToNumber } from '../model/classes.js'
+import type { LiveIssue, LiveProject } from '../huly/views.js'
+import { findOrCreate } from './find-or-create.js'
 import {
   chunter,
   combineName,
@@ -85,22 +87,43 @@ export class TrackerImporter {
   async applyLinks (): Promise<{ counts: ImportCounts, problems: string[] }> {
     const counts = zeroCounts()
     const problems: string[] = []
+    // Cache target lookups (many links share a target) and each source's
+    // current link-set (read once from live state, then maintained in memory)
+    // — avoids the O(links) target + source findOne the naive loop did, while
+    // keeping cross-run idempotency.
+    const targetById = new Map<string, Doc | null>()
+    const sourceSet = new Map<string, Set<string>>()
+
+    const resolveTarget = async (identifier: string): Promise<Doc | null> => {
+      const hit = targetById.get(identifier)
+      if (hit !== undefined) return hit
+      const t = (await this.client.findOne(tracker.class.Issue, { identifier })) ?? null
+      targetById.set(identifier, t)
+      return t
+    }
+    const linkSet = async (fromId: Ref, field: string): Promise<Set<string>> => {
+      const key = `${fromId}:${field}`
+      let set = sourceSet.get(key)
+      if (set == null) {
+        const fresh = await this.client.findOne(tracker.class.Issue, { _id: fromId })
+        set = new Set(((fresh?.[field] as Array<{ _id: Ref }> | undefined) ?? []).map((r) => String(r._id)))
+        sourceSet.set(key, set)
+      }
+      return set
+    }
+
     for (const link of this.pendingLinks) {
-      const target = await this.client.findOne(tracker.class.Issue, { identifier: link.target })
+      const target = await resolveTarget(link.target)
       if (target == null) {
         problems.push(`${link.fromIdentifier}: ${link.field} target ${link.target} not found`)
         continue
       }
-      const fresh = await this.client.findOne(tracker.class.Issue, { _id: link.fromId })
-      const existing = ((fresh?.[link.field] as Array<{ _id: Ref }> | undefined) ?? [])
-        .some((r) => r._id === target._id)
-      if (existing) {
-        counts.skipped++
-        continue
-      }
+      const set = await linkSet(link.fromId, link.field)
+      if (set.has(String(target._id))) { counts.skipped++; continue }
       await this.client.updateDoc(tracker.class.Issue, link.fromSpace, link.fromId, {
         $push: { [link.field]: { _id: target._id, _class: tracker.class.Issue } },
       })
+      set.add(String(target._id))
       this.logger.debug(`    ✓ ${link.fromIdentifier} ${link.field} → ${link.target}`)
       counts.updated++
     }
@@ -136,8 +159,8 @@ export class TrackerImporter {
     // otherwise find the workspace's tracker ProjectType directly (works in
     // an empty workspace with no projects yet — e.g. the classic project
     // type, `tracker:ids:ClassingProjectType`).
-    const anyProject = await this.client.findOne(tracker.class.Project, {})
-    let type = anyProject?.['type'] as Ref | undefined
+    const anyProject = await this.client.findOne<LiveProject>(tracker.class.Project, {})
+    let type = anyProject?.type
     if (type == null) {
       const pt = await this.client.findOne(task.class.ProjectType, { descriptor: tracker.descriptors.ProjectType })
       type = pt?._id
@@ -180,7 +203,7 @@ export class TrackerImporter {
 
   private async importIssue (
     project: ImportProject,
-    live: Doc,
+    live: LiveProject,
     issue: ImportIssue,
     parentId: Ref,
     parents: Array<Record<string, unknown>>,
@@ -189,12 +212,12 @@ export class TrackerImporter {
     problems: string[],
   ): Promise<void> {
     // Idempotency: an issue with the same title already in this project?
-    let doc = await this.client.findOne(tracker.class.Issue, { space: live._id, title: issue.title })
+    let doc = await this.client.findOne<LiveIssue>(tracker.class.Issue, { space: live._id, title: issue.title })
     let identifier: string
     let created = false
 
     if (doc != null) {
-      identifier = String(doc['identifier'])
+      identifier = String(doc.identifier)
       counts.skipped++
     } else {
       const result = await this.createIssue(project, live, issue, parentId, parents, problems)
@@ -230,7 +253,7 @@ export class TrackerImporter {
 
   private async createIssue (
     project: ImportProject,
-    live: Doc,
+    live: LiveProject,
     issue: ImportIssue,
     parentId: Ref,
     parents: Array<Record<string, unknown>>,
@@ -238,7 +261,7 @@ export class TrackerImporter {
   ): Promise<{ doc: Doc, identifier: string } | null> {
     // The issue's `kind` must be a TaskType of THIS project's type — never fall
     // back to "any TaskType in the workspace" (that assigns the wrong kind).
-    const projectType = live['type'] as Ref | undefined
+    const projectType = live.type
     if (projectType == null) {
       problems.push(`${project.identifier}: project has no type — cannot resolve TaskType`)
       return null
@@ -258,12 +281,12 @@ export class TrackerImporter {
     const number = issue.number ?? await this.allocateNumber(live)
     const identifier = `${project.identifier}-${number}`
 
-    const lastIssue = await this.client.findOne(
+    const lastIssue = await this.client.findOne<LiveIssue>(
       tracker.class.Issue,
       { space: live._id },
       { sort: { rank: SortingOrder.Descending } },
     )
-    const rank = makeRank(lastIssue?.['rank'] as string | undefined, undefined)
+    const rank = makeRank(lastIssue?.rank, undefined)
 
     const issueId = generateId()
     let descriptionRef: Ref | null = null
@@ -334,7 +357,7 @@ export class TrackerImporter {
   private async resolveStatus (
     name: string | undefined,
     _project: ImportProject,
-    live: Doc | undefined,
+    live: LiveProject | undefined,
   ): Promise<Ref | undefined> {
     if (name != null) {
       const byName = await this.client.findOne(tracker.class.IssueStatus, {
@@ -342,7 +365,7 @@ export class TrackerImporter {
       })
       if (byName != null) return byName._id
     }
-    const def = live?.['defaultIssueStatus'] as Ref | undefined
+    const def = live?.defaultIssueStatus
     if (def != null) return def
     const backlog = await this.client.findOne(tracker.class.IssueStatus, {
       name: 'Backlog', ofAttribute: tracker.attribute.IssueStatus,
@@ -354,16 +377,17 @@ export class TrackerImporter {
 
   private async enrichIssue (
     live: Doc,
-    issue: Doc,
+    issue: LiveIssue,
     spec: ImportIssue,
     counts: ImportCounts,
     problems: string[],
   ): Promise<void> {
+    const id = String(issue.identifier)
     if (spec.assignee != null) {
       const want = await this.resolveAssignee(spec.assignee)
       if (want == null) {
-        problems.push(`${String(issue['identifier'])}: assignee '${spec.assignee}' not found`)
-      } else if (issue['assignee'] === want) {
+        problems.push(`${id}: assignee '${spec.assignee}' not found`)
+      } else if (issue.assignee === want) {
         counts.skipped++
       } else {
         await this.client.updateDoc(tracker.class.Issue, live._id, issue._id, { assignee: want })
@@ -371,30 +395,34 @@ export class TrackerImporter {
       }
     }
     if (spec.component != null) {
-      if (issue['component'] != null) {
+      if (issue.component != null) {
         counts.skipped++
       } else {
         const c = await this.findOrCreateComponent(live, spec.component)
         if (c != null) {
           await this.client.updateDoc(tracker.class.Issue, live._id, issue._id, { component: c._id })
           counts.updated++
+        } else {
+          problems.push(`${id}: component '${spec.component}' could not be applied`)
         }
       }
     }
     if (spec.milestone != null) {
-      if (issue['milestone'] != null) {
+      if (issue.milestone != null) {
         counts.skipped++
       } else {
         const m = await this.findOrCreateMilestone(live, spec.milestone)
         if (m != null) {
           await this.client.updateDoc(tracker.class.Issue, live._id, issue._id, { milestone: m._id })
           counts.updated++
+        } else {
+          problems.push(`${id}: milestone '${spec.milestone}' could not be applied`)
         }
       }
     }
     for (const label of spec.labels ?? []) {
       const tag = await this.findOrCreateTag(label)
-      if (tag == null) continue
+      if (tag == null) { problems.push(`${id}: label '${label}' could not be applied`); continue }
       const has = await this.client.findOne(tags.class.TagReference, {
         attachedTo: issue._id, tag: tag._id,
       })
@@ -480,45 +508,29 @@ export class TrackerImporter {
   // ─── find-or-create helpers ──────────────────────────────────────────────
 
   private async findOrCreateComponent (live: Doc, label: string): Promise<Doc | null> {
-    const key = `${live._id}:${label}`
-    const cached = this.componentCache.get(key)
-    if (cached !== undefined) return cached
-    let c = await this.client.findOne(tracker.class.Component, { space: live._id, label })
-    if (c == null) {
-      const id = await this.client.createDoc(tracker.class.Component, live._id, { label, description: '', lead: null })
-      c = await this.client.findOne(tracker.class.Component, { _id: id })
-    }
-    this.componentCache.set(key, c ?? null)
-    return c ?? null
+    return findOrCreate(
+      this.client, this.componentCache, `${live._id}:${label}`,
+      tracker.class.Component, { space: live._id, label },
+      () => this.client.createDoc(tracker.class.Component, live._id, { label, description: '', lead: null }),
+    )
   }
 
   private async findOrCreateMilestone (live: Doc, label: string): Promise<Doc | null> {
-    const key = `${live._id}:${label}`
-    const cached = this.milestoneCache.get(key)
-    if (cached !== undefined) return cached
-    let m = await this.client.findOne(tracker.class.Milestone, { space: live._id, label })
-    if (m == null) {
-      const id = await this.client.createDoc(tracker.class.Milestone, live._id, {
-        label, description: '', status: 0, targetDate: 0, capacity: 0,
-      })
-      m = await this.client.findOne(tracker.class.Milestone, { _id: id })
-    }
-    this.milestoneCache.set(key, m ?? null)
-    return m ?? null
+    return findOrCreate(
+      this.client, this.milestoneCache, `${live._id}:${label}`,
+      tracker.class.Milestone, { space: live._id, label },
+      () => this.client.createDoc(tracker.class.Milestone, live._id, { label, description: '', status: 0, targetDate: 0, capacity: 0 }),
+    )
   }
 
   private async findOrCreateTag (title: string): Promise<Doc | null> {
-    const cached = this.tagCache.get(title)
-    if (cached !== undefined) return cached
-    let t = await this.client.findOne(tags.class.TagElement, { title, targetClass: tracker.class.Issue })
-    if (t == null) {
-      const id = await this.client.createDoc(tags.class.TagElement, this.tagSpace, {
+    return findOrCreate(
+      this.client, this.tagCache, title,
+      tags.class.TagElement, { title, targetClass: tracker.class.Issue },
+      () => this.client.createDoc(tags.class.TagElement, this.tagSpace, {
         title, description: '', color: hashColor(title), targetClass: tracker.class.Issue,
         category: tracker.category.Other, refCount: 0,
-      })
-      t = await this.client.findOne(tags.class.TagElement, { _id: id })
-    }
-    this.tagCache.set(title, t ?? null)
-    return t ?? null
+      }),
+    )
   }
 }

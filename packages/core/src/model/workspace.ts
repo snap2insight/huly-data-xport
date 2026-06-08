@@ -46,6 +46,9 @@ export interface ImportWorkspace {
   organizations?: ImportOrganization[]
   /** Text/message template categories. */
   templateCategories?: ImportTemplateCategory[]
+  /** Space YAMLs whose `class` we don't import (recorded, not silently dropped);
+   *  surfaced via `ImportResult.unsupported`. e.g. QMS controlled-documents. */
+  unsupported?: string[]
 }
 
 /** An empty IR — a convenient starting point for sources that build up. */

@@ -32,6 +32,13 @@ export class WorkspaceImporter {
   async performImport (ws: ImportWorkspace, options: ImportOptions = {}): Promise<ImportResult> {
     const result = emptyResult()
 
+    // Surface anything the parser flagged as unsupported (unknown-class YAMLs)
+    // instead of letting it vanish.
+    if ((ws.unsupported?.length ?? 0) > 0) {
+      result.unsupported.push(...(ws.unsupported ?? []))
+      this.logger.warn(`unsupported (not imported): ${(ws.unsupported ?? []).join(', ')}`)
+    }
+
     // People first, so assignees / members can be resolved by later steps.
     if (((ws.people?.length ?? 0) + (ws.departments?.length ?? 0) + (ws.organizations?.length ?? 0)) > 0) {
       this.logger.info(`people (${ws.departments?.length ?? 0} departments, ${ws.people?.length ?? 0} people, ${ws.organizations?.length ?? 0} organizations)`)
