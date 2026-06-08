@@ -1,6 +1,6 @@
 {
   "name": "@huly-data-xport/core",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Reusable, surface-agnostic core for importing/exporting data with Huly: a typed ImportWorkspace model, universal-format emit/parse/validate, and an import/export engine built entirely on published @hcengineering/* packages (no Docker).",
   "license": "Apache-2.0",
   "type": "module",
