@@ -1,0 +1,5 @@
+class: tracker:class:Project
+title: Moonshots
+identifier: MOON
+description: Exploratory bets
+defaultIssueStatus: Backlog

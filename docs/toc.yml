@@ -1,0 +1,50 @@
+# Table of Contents for the huly-data-xport docs site.
+# Imported into myst.yml via `extends:`.
+#
+# Reading flow:
+#   1. Landing       — what is this, why it exists
+#   2. Intro         — what it is, getting started, core concepts
+#   3. Guide         — the five pipeline verbs, end to end
+#   4. Design        — architecture + the decisions behind it (for contributors + AI agents)
+#   5. Reference     — universal format, capability matrix, Huly API notes
+#   6. Contributing  — local dev, adding a source, releases
+version: 1
+project:
+  toc:
+    - file: landing-page.md
+
+    - title: "Intro"
+      children:
+        - file: intro/what-is-it.md
+        - file: intro/getting-started.md
+        - file: intro/concepts.md
+
+    - title: "Guide"
+      children:
+        - file: guide/prepare.md
+        - file: guide/validate.md
+        - file: guide/import.md
+        - file: guide/verify-and-report.md
+        - file: guide/people-templates-multiworkspace.md
+        - file: guide/db-migration.md
+        - file: guide/api-migration.md
+
+    - title: "Design"
+      children:
+        - file: design/architecture.md
+        - file: design/pipeline.md
+        - file: design/published-primitives.md
+        - file: design/decisions.md
+
+    - title: "Reference"
+      children:
+        - file: reference/universal-format.md
+        - file: reference/capabilities.md
+        - file: reference/huly-api-notes.md
+
+    - title: "Contributing"
+      children:
+        - file: contributing/overview.md
+        - file: contributing/local-development.md
+        - file: contributing/adding-a-source.md
+        - file: contributing/releases.md

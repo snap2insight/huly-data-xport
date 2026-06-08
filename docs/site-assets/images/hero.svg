@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 480" role="img" aria-label="Huly App Migrator">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f2937"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="480" fill="url(#bg)"/>
+  <!-- Centered safe zone (x 150–450) so cover-cropping keeps it visible. -->
+  <text x="300" y="180" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="700" fill="#f9fafb" text-anchor="middle">Huly App Migrator</text>
+  <text x="300" y="214" font-family="Helvetica,Arial,sans-serif" font-size="15" fill="#9ca3af" text-anchor="middle">prepare · validate · import · verify · report</text>
+  <!-- compact source → universal format → Huly motif -->
+  <g font-family="Helvetica,Arial,sans-serif" text-anchor="middle">
+    <text x="300" y="276" font-size="12" fill="#818cf8">universal format</text>
+    <rect x="150" y="290" width="96" height="48" rx="8" fill="none" stroke="#4b5563" stroke-width="2"/>
+    <text x="198" y="320" font-size="14" fill="#9ca3af">source</text>
+    <line x1="252" y1="314" x2="342" y2="314" stroke="#6366f1" stroke-width="2"/>
+    <polygon points="342,308 356,314 342,320" fill="#6366f1"/>
+    <rect x="362" y="290" width="96" height="48" rx="8" fill="#6366f1"/>
+    <text x="410" y="320" font-size="15" font-weight="700" fill="#f9fafb">Huly</text>
+  </g>
+</svg>

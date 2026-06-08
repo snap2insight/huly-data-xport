@@ -1,0 +1,57 @@
+# Release — fires when a `v*` git tag is pushed.
+#
+# Creates an annotated GitHub Release with auto-generated notes.
+#
+# Cutting a release:
+#   git tag -a v1.0.0 -m "v1.0.0"
+#   git push origin v1.0.0
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (must already exist)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  release-notes:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0          # full history for auto-generated notes
+
+      - name: Resolve tag
+        id: tag
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          echo "name=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Releasing: $TAG"
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # If a release for this tag already exists (e.g. workflow_dispatch
+          # re-run), skip. --generate-notes auto-fills from commit history.
+          if gh release view "${{ steps.tag.outputs.name }}" >/dev/null 2>&1; then
+            echo "::notice::Release ${{ steps.tag.outputs.name }} already exists; skipping."
+            exit 0
+          fi
+          gh release create "${{ steps.tag.outputs.name }}" \
+            --title "${{ steps.tag.outputs.name }}" \
+            --generate-notes \
+            --verify-tag

@@ -1,0 +1,7 @@
+class: card:class:MasterTag
+title: Account
+properties:
+  - label: seats
+    type: TypeNumber
+  - label: tier
+    enumOf: Tier

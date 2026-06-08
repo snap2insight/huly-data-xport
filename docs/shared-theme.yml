@@ -1,0 +1,13 @@
+# Theme wiring for the docs site.
+#
+# Template, CSS overlay, and the default footer all come from the
+# myst-docs-toolkit, referenced through the `_toolkit/` path (a local
+# symlink for devs; fetched by CI in .github/workflows/docs.yml).
+version: 1
+site:
+  template: _toolkit/templates/book-theme
+  options:
+    style: _toolkit/css/site.css
+    hide_authors: true
+  parts:
+    footer: _toolkit/parts/footer.md

@@ -1,0 +1,5 @@
+class: tracker:class:Project
+title: API
+identifier: API
+description: Public + internal API services
+defaultIssueStatus: Backlog

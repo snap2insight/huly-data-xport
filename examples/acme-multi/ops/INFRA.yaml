@@ -1,0 +1,4 @@
+class: tracker:class:Project
+title: Infrastructure
+identifier: INFRA
+defaultIssueStatus: Backlog

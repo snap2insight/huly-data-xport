@@ -1,0 +1,28 @@
+{
+  "name": "huly-data-xport",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bulk import/export + post-import toolkit for Huly — prepare data in the universal format from any source, validate, import, verify, export, and report. Fills gaps the official import-tool leaves (labels, milestones, components, issue links, append-to-existing-project, idempotent re-runs).",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/snap2insight/huly-data-xport.git"
+  },
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "tsc --build",
+    "test": "npm run test --workspaces --if-present",
+    "migrate": "node packages/cli/dist/index.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,10 @@
+# Multi-workspace manifest. Each entry maps a logical workspace name to a
+# subdir whose source/ (if present) or root is a universal-format tree.
+# Run: huly-data-xport validate --content examples/acme-multi
+#      huly-data-xport import   --content examples/acme-multi            (all)
+#      huly-data-xport import   --content examples/acme-multi -w acme-ops (one)
+workspaces:
+  - name: acme-dev
+    path: dev
+  - name: acme-ops
+    path: ops

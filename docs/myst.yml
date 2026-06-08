@@ -1,0 +1,50 @@
+# huly-data-xport docs site.
+#
+# Built with mystmd and the snap2insight/myst-docs-toolkit (book-theme +
+# CSS overlay + mermaid plugin), fetched into `_toolkit/` at build time
+# (gitignored). Deployed to GitHub Pages by .github/workflows/docs.yml.
+#
+# Run locally:  cd docs && myst start      (or `just docs-dev` from root)
+version: 1
+extends:
+  - toc.yml
+  - shared-theme.yml
+
+project:
+  id: huly-data-xport-docs
+  github: https://github.com/snap2insight/huly-data-xport
+  title: "Huly App Migrator"
+  description: "Prepare data in Huly's universal format from any source, validate it, import it over WebSocket (no Docker), then verify and report — a reusable TypeScript core with a CLI and more surfaces to come."
+  authors:
+    - name: huly-data-xport contributors
+  license: Apache-2.0
+  keywords:
+    - huly
+    - migration
+    - import
+    - universal-format
+    - tracker
+    - typescript
+    - esm
+  # The mermaid plugin ships in the toolkit, vendored at build time.
+  plugins:
+    - type: executable
+      path: _toolkit/plugins/myst-mermaid/plugin.py
+  settings:
+    parser:
+      dollarmath: false
+  exclude:
+    - "_build/**"
+    - "_toolkit/**"
+    - "**/node_modules/**"
+  numbering:
+    headings: false
+    figure:
+      enabled: true
+    table:
+      enabled: true
+
+site:
+  options:
+    logo_text: "Huly App Migrator"
+    hover_xref: true
