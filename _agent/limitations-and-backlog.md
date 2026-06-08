@@ -19,14 +19,14 @@ and the bogus `HULY_API_TOKEN` path · shared `priorityToNumber` · CI `npm ci` 
 `.env.example`s + scrubbed example secret · reconcile test suite (5 tests) · doc
 correctness (mermaid `;`, broken links, auth in samples).
 
-### Batch A — safe refactors + tests (no behaviour change)
-- ✅ **Test suites added**: `people` (departments/parent tree, persons, Employee mixin, channels+social-id, Staff-mixin membership, lead resolution, idempotency, missing-dept problem), `verify` (match / notFound / wrong-component / missing-label / extra-label warning-vs-strict). Shared mutating fake extracted to `engine/fake-platform.ts` (used by reconcile + people + verify). **31 tests total.**
-  - ⏳ `invite` still untested — it runs on the account-client (not `PlatformClient`), so it needs the role/ordering logic extracted to a pure helper first; do this with the refactors.
-- **Generic `findOrCreate`/`ensure` helper** to de-dupe the cached find→create→re-find pattern across tracker/cards/people/templates.
-- **Typed live-doc views** (`interface LiveProject/LiveIssue extends Doc`) to replace the many `doc['field'] as Ref` site-casts (catches field-name typos at compile time).
-- Populate **`result.unsupported`** (QMS/card-blobs/instance-associations currently vanish silently) and make requested-but-unapplied component/milestone/label observable (count or problem).
-- `try/finally` close on account clients in `huly/workspace.ts` (soft leak).
-- `applyLinks` batching (currently O(n) findOne-per-link; the source doc is already known at queue time).
+### Batch A — DONE on branch `v0.2.0` (42 tests, build green; live-verified on local Huly)
+- ✅ **Test suites**: `people`, `verify`, `reconcile`, `invite-plan`, `find-or-create` + the parse `unsupported` test. Shared mutating fake in `engine/fake-platform.ts`.
+- ✅ **`invite` role/order logic** extracted to a pure, tested `planInvites()` (core) — closed the untested-verb gap.
+- ✅ **Generic `findOrCreate()`** — tracker component/milestone/label use it (cards' counting/attribute ensures intentionally left; not the same cached pattern).
+- ✅ **Observability** — `parse` records unknown-class YAMLs → `ImportResult.unsupported` (was a dead field); enrich pushes a `problem` for an unapplied component/milestone/label.
+- ✅ **Account-client "leak"** — verified moot (stateless `fetch` client, no `close()`); noted in `workspace.ts`.
+- ✅ **`applyLinks` batched** — caches target lookups + loads each source's link-set once (was O(links) findOne×2), idempotency preserved.
+- ⏭️ **Deferred to a follow-up: typed live-doc views** (`interface LiveProject/LiveIssue`) to replace `doc['field'] as Ref` casts — high churn, modest benefit; not worth bloating the v0.2.0 PR.
 
 ### Batch B — DONE (verified on local self-hosted Huly @ 0.7.423)
 - ✅ **Issue `assignee`** now resolved (against the live workspace, by email or "Last,First"/"First Last" name) and set **idempotently** in `enrichIssue`; unresolved → a `problem`. Proven live (acme-dev WEB-1 → Doe,Jane). This was the real cause of unassigned issues (the engine had only ever written `assignee: null`).
