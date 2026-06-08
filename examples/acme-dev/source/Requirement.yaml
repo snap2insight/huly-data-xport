@@ -1,0 +1,7 @@
+class: card:class:MasterTag
+title: Requirement
+properties:
+  - label: targetRelease
+    type: TypeString
+  - label: type
+    enumOf: RequirementType

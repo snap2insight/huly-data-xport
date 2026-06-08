@@ -1,0 +1,7 @@
+class: core:class:Enum
+title: Criticality
+values:
+  - Low
+  - Medium
+  - High
+  - Mission-Critical

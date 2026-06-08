@@ -1,0 +1,7 @@
+class: card:class:MasterTag
+title: RFP
+properties:
+  - label: budget
+    type: TypeNumber
+  - label: account
+    refTo: Account

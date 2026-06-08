@@ -1,0 +1,6 @@
+class: core:class:Association
+typeA: Account
+typeB: RFP
+nameA: rfps
+nameB: account
+type: 1:N

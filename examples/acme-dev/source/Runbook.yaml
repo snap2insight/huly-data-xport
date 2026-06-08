@@ -1,0 +1,7 @@
+class: card:class:MasterTag
+title: Runbook
+properties:
+  - label: service
+    type: TypeString
+  - label: criticality
+    enumOf: Criticality
