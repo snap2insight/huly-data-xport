@@ -378,6 +378,8 @@ export class TrackerImporter {
         if (c != null) {
           await this.client.updateDoc(tracker.class.Issue, live._id, issue._id, { component: c._id })
           counts.updated++
+        } else {
+          problems.push(`${String(issue['identifier'])}: component '${spec.component}' could not be applied`)
         }
       }
     }
@@ -389,12 +391,14 @@ export class TrackerImporter {
         if (m != null) {
           await this.client.updateDoc(tracker.class.Issue, live._id, issue._id, { milestone: m._id })
           counts.updated++
+        } else {
+          problems.push(`${String(issue['identifier'])}: milestone '${spec.milestone}' could not be applied`)
         }
       }
     }
     for (const label of spec.labels ?? []) {
       const tag = await this.findOrCreateTag(label)
-      if (tag == null) continue
+      if (tag == null) { problems.push(`${String(issue['identifier'])}: label '${label}' could not be applied`); continue }
       const has = await this.client.findOne(tags.class.TagReference, {
         attachedTo: issue._id, tag: tag._id,
       })

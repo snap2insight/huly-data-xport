@@ -65,6 +65,11 @@ export async function parse (dir: string): Promise<ImportWorkspace> {
         (ws.templateCategories ??= []).push(await parseTemplateCategory(cfg, spaceDir))
         break
       default:
+        // A declared class we don't import — record it (surfaced via
+        // ImportResult.unsupported) rather than silently dropping the file.
+        if (cls != null && String(cls).length > 0) {
+          (ws.unsupported ??= []).push(`${String(cls)} (${entry})`)
+        }
         break
     }
   }

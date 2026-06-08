@@ -28,6 +28,9 @@ const POLL_MS = 4000
 const TIMEOUT_MS = 180000
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
+// NOTE: the account client is a stateless `fetch`-based HTTP client — it holds
+// no socket/agent and has no close()/dispose(), so the clients created here
+// need no explicit teardown (nothing to leak).
 async function login (opts: WorkspaceOptions): Promise<{ client: AccountClient, accountsUrl: string }> {
   const frontUrl = opts.frontUrl ?? 'https://huly.app'
   const cfg = await apiClient.loadServerConfig(frontUrl)

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -76,6 +76,19 @@ test('frontmatter round-trips', () => {
   assert.equal(frontmatter['title'], 'X')
   assert.deepEqual(frontmatter['labels'], ['a', 'b'])
   assert.equal(body, '# Body\n\ntext')
+})
+
+test('parse records unknown-class YAMLs as unsupported (not silently dropped)', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'hm-unsup-'))
+  try {
+    await writeFile(join(dir, 'Secret.yaml'), 'class: controlled-documents:class:OrgSpace\ntitle: QMS\n')
+    const ws = await parse(dir)
+    const u = ws.unsupported ?? []
+    assert.ok(u.some((x) => x.includes('controlled-documents:class:OrgSpace')), 'records the unknown class')
+    assert.ok(u.some((x) => x.includes('Secret.yaml')), 'records the source file')
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
 })
 
 test('emit → parse round-trips the IR', async () => {
