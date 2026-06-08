@@ -28,7 +28,7 @@
   "scripts": {
     "build": "tsc --build",
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
-    "test": "node --test dist/"
+    "test": "node --test dist/engine/ dist/format/ dist/model/"
   },
   "dependencies": {
     "@hcengineering/account-client": "0.7.423",

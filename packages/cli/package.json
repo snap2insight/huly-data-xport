@@ -11,7 +11,7 @@
   "scripts": {
     "build": "tsc --build",
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
-    "test": "node --test dist/"
+    "test": "node --test dist/util.test.js"
   },
   "dependencies": {
     "@huly-data-xport/core": "0.1.0",
