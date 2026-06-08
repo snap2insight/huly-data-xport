@@ -22,7 +22,8 @@ correctness (mermaid `;`, broken links, auth in samples).
 ### Batch A — DONE on branch `v0.2.0` (42 tests, build green; live-verified on local Huly)
 - ✅ **Test suites**: `people`, `verify`, `reconcile`, `invite-plan`, `find-or-create` + the parse `unsupported` test. Shared mutating fake in `engine/fake-platform.ts`.
 - ✅ **`invite` role/order logic** extracted to a pure, tested `planInvites()` (core) — closed the untested-verb gap.
-- ✅ **Generic `findOrCreate()`** — tracker component/milestone/label use it (cards' counting/attribute ensures intentionally left; not the same cached pattern).
+- ✅ **Generic `findOrCreate()`** — tracker component/milestone/label use it; plus a counting sibling **`ensureDoc()`** now used by the card enum/master-tag/card-tag/association ensures.
+- ✅ **Typed live-doc views** (`huly/views.ts`: `LiveProject`/`LiveIssue`/`LiveLabelled`/`LiveTagRef`/…) applied to the heavy live-read paths (`tracker`, `verify`) — `doc.field` typed reads instead of `doc['field'] as Ref`. `reconcile` intentionally keeps its `AnyDoc` (Doc & Record) because it reads a mixin by a dynamic Ref key (`imported[hr.mixin.Staff]`), which needs the index signature; `parse` keeps `Record<string,unknown>` (genuinely untyped YAML input).
 - ✅ **Observability** — `parse` records unknown-class YAMLs → `ImportResult.unsupported` (was a dead field); enrich pushes a `problem` for an unapplied component/milestone/label.
 - ✅ **Account-client "leak"** — verified moot (stateless `fetch` client, no `close()`); noted in `workspace.ts`.
 - ✅ **`applyLinks` batched** — caches target lookups + loads each source's link-set once (was O(links) findOne×2), idempotency preserved.

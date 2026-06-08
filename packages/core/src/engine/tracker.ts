@@ -8,6 +8,7 @@
 import type { ImportComment, ImportIssue, ImportProject } from '../model/entities.js'
 import { resolveMarkdown } from '../model/content.js'
 import { priorityToNumber } from '../model/classes.js'
+import type { LiveIssue, LiveProject } from '../huly/views.js'
 import { findOrCreate } from './find-or-create.js'
 import {
   chunter,
@@ -158,8 +159,8 @@ export class TrackerImporter {
     // otherwise find the workspace's tracker ProjectType directly (works in
     // an empty workspace with no projects yet — e.g. the classic project
     // type, `tracker:ids:ClassingProjectType`).
-    const anyProject = await this.client.findOne(tracker.class.Project, {})
-    let type = anyProject?.['type'] as Ref | undefined
+    const anyProject = await this.client.findOne<LiveProject>(tracker.class.Project, {})
+    let type = anyProject?.type
     if (type == null) {
       const pt = await this.client.findOne(task.class.ProjectType, { descriptor: tracker.descriptors.ProjectType })
       type = pt?._id
@@ -202,7 +203,7 @@ export class TrackerImporter {
 
   private async importIssue (
     project: ImportProject,
-    live: Doc,
+    live: LiveProject,
     issue: ImportIssue,
     parentId: Ref,
     parents: Array<Record<string, unknown>>,
@@ -211,12 +212,12 @@ export class TrackerImporter {
     problems: string[],
   ): Promise<void> {
     // Idempotency: an issue with the same title already in this project?
-    let doc = await this.client.findOne(tracker.class.Issue, { space: live._id, title: issue.title })
+    let doc = await this.client.findOne<LiveIssue>(tracker.class.Issue, { space: live._id, title: issue.title })
     let identifier: string
     let created = false
 
     if (doc != null) {
-      identifier = String(doc['identifier'])
+      identifier = String(doc.identifier)
       counts.skipped++
     } else {
       const result = await this.createIssue(project, live, issue, parentId, parents, problems)
@@ -252,7 +253,7 @@ export class TrackerImporter {
 
   private async createIssue (
     project: ImportProject,
-    live: Doc,
+    live: LiveProject,
     issue: ImportIssue,
     parentId: Ref,
     parents: Array<Record<string, unknown>>,
@@ -260,7 +261,7 @@ export class TrackerImporter {
   ): Promise<{ doc: Doc, identifier: string } | null> {
     // The issue's `kind` must be a TaskType of THIS project's type — never fall
     // back to "any TaskType in the workspace" (that assigns the wrong kind).
-    const projectType = live['type'] as Ref | undefined
+    const projectType = live.type
     if (projectType == null) {
       problems.push(`${project.identifier}: project has no type — cannot resolve TaskType`)
       return null
@@ -280,12 +281,12 @@ export class TrackerImporter {
     const number = issue.number ?? await this.allocateNumber(live)
     const identifier = `${project.identifier}-${number}`
 
-    const lastIssue = await this.client.findOne(
+    const lastIssue = await this.client.findOne<LiveIssue>(
       tracker.class.Issue,
       { space: live._id },
       { sort: { rank: SortingOrder.Descending } },
     )
-    const rank = makeRank(lastIssue?.['rank'] as string | undefined, undefined)
+    const rank = makeRank(lastIssue?.rank, undefined)
 
     const issueId = generateId()
     let descriptionRef: Ref | null = null
@@ -356,7 +357,7 @@ export class TrackerImporter {
   private async resolveStatus (
     name: string | undefined,
     _project: ImportProject,
-    live: Doc | undefined,
+    live: LiveProject | undefined,
   ): Promise<Ref | undefined> {
     if (name != null) {
       const byName = await this.client.findOne(tracker.class.IssueStatus, {
@@ -364,7 +365,7 @@ export class TrackerImporter {
       })
       if (byName != null) return byName._id
     }
-    const def = live?.['defaultIssueStatus'] as Ref | undefined
+    const def = live?.defaultIssueStatus
     if (def != null) return def
     const backlog = await this.client.findOne(tracker.class.IssueStatus, {
       name: 'Backlog', ofAttribute: tracker.attribute.IssueStatus,
@@ -376,16 +377,17 @@ export class TrackerImporter {
 
   private async enrichIssue (
     live: Doc,
-    issue: Doc,
+    issue: LiveIssue,
     spec: ImportIssue,
     counts: ImportCounts,
     problems: string[],
   ): Promise<void> {
+    const id = String(issue.identifier)
     if (spec.assignee != null) {
       const want = await this.resolveAssignee(spec.assignee)
       if (want == null) {
-        problems.push(`${String(issue['identifier'])}: assignee '${spec.assignee}' not found`)
-      } else if (issue['assignee'] === want) {
+        problems.push(`${id}: assignee '${spec.assignee}' not found`)
+      } else if (issue.assignee === want) {
         counts.skipped++
       } else {
         await this.client.updateDoc(tracker.class.Issue, live._id, issue._id, { assignee: want })
@@ -393,7 +395,7 @@ export class TrackerImporter {
       }
     }
     if (spec.component != null) {
-      if (issue['component'] != null) {
+      if (issue.component != null) {
         counts.skipped++
       } else {
         const c = await this.findOrCreateComponent(live, spec.component)
@@ -401,12 +403,12 @@ export class TrackerImporter {
           await this.client.updateDoc(tracker.class.Issue, live._id, issue._id, { component: c._id })
           counts.updated++
         } else {
-          problems.push(`${String(issue['identifier'])}: component '${spec.component}' could not be applied`)
+          problems.push(`${id}: component '${spec.component}' could not be applied`)
         }
       }
     }
     if (spec.milestone != null) {
-      if (issue['milestone'] != null) {
+      if (issue.milestone != null) {
         counts.skipped++
       } else {
         const m = await this.findOrCreateMilestone(live, spec.milestone)
@@ -414,13 +416,13 @@ export class TrackerImporter {
           await this.client.updateDoc(tracker.class.Issue, live._id, issue._id, { milestone: m._id })
           counts.updated++
         } else {
-          problems.push(`${String(issue['identifier'])}: milestone '${spec.milestone}' could not be applied`)
+          problems.push(`${id}: milestone '${spec.milestone}' could not be applied`)
         }
       }
     }
     for (const label of spec.labels ?? []) {
       const tag = await this.findOrCreateTag(label)
-      if (tag == null) { problems.push(`${String(issue['identifier'])}: label '${label}' could not be applied`); continue }
+      if (tag == null) { problems.push(`${id}: label '${label}' could not be applied`); continue }
       const has = await this.client.findOne(tags.class.TagReference, {
         attachedTo: issue._id, tag: tag._id,
       })

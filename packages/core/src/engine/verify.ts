@@ -4,6 +4,7 @@
 import type { ImportIssue, ImportProject } from '../model/entities.js'
 import type { ImportWorkspace } from '../model/workspace.js'
 import { type Doc, type PlatformClient, type Ref, tags, tracker } from '../huly/platform.js'
+import type { LiveIssue, LiveLabelled, LiveTagRef } from '../huly/views.js'
 
 export interface IssueVerification {
   identifier: string
@@ -74,7 +75,7 @@ async function verifyIssue (
     return await recurse(client, project, live, spec, options, result)
   }
 
-  const doc = await client.findOne(tracker.class.Issue, { space: live._id, title: spec.title })
+  const doc = await client.findOne<LiveIssue>(tracker.class.Issue, { space: live._id, title: spec.title })
   if (doc == null) {
     v.errors.push('issue not found')
     result.notFound++
@@ -82,10 +83,10 @@ async function verifyIssue (
     return await recurse(client, project, live, spec, options, result)
   }
   v.found = true
-  v.identifier = String(doc['identifier'])
+  v.identifier = String(doc.identifier)
 
-  await checkNamed(client, tracker.class.Component, doc['component'] as Ref | undefined, spec.component, 'component', options, v)
-  await checkNamed(client, tracker.class.Milestone, doc['milestone'] as Ref | undefined, spec.milestone, 'milestone', options, v)
+  await checkNamed(client, tracker.class.Component, doc.component ?? undefined, spec.component, 'component', options, v)
+  await checkNamed(client, tracker.class.Milestone, doc.milestone ?? undefined, spec.milestone, 'milestone', options, v)
   await checkLabels(client, doc, spec, options, v)
   await checkLinks(client, doc, 'blockedBy', spec.blockedBy ?? [], v)
   await checkLinks(client, doc, 'relations', spec.relatedTo ?? [], v)
@@ -123,7 +124,7 @@ async function checkNamed (
   v: IssueVerification,
 ): Promise<void> {
   const actualLabel = actualRef != null
-    ? String((await client.findOne(cls, { _id: actualRef }))?.['label'] ?? '<not-found>')
+    ? String((await client.findOne<LiveLabelled>(cls, { _id: actualRef }))?.label ?? '<not-found>')
     : undefined
   if (expectedLabel != null) {
     if (actualLabel == null) v.errors.push(`${field}: expected '${expectedLabel}', got <none>`)
@@ -142,8 +143,8 @@ async function checkLabels (
   options: VerifyOptions,
   v: IssueVerification,
 ): Promise<void> {
-  const refs = await client.findAll(tags.class.TagReference, { attachedTo: doc._id })
-  const actual = refs.map((t) => String(t['title']))
+  const refs = await client.findAll<LiveTagRef>(tags.class.TagReference, { attachedTo: doc._id })
+  const actual = refs.map((t) => String(t.title))
   const { missing, extra } = setDiff(spec.labels ?? [], actual)
   if (missing.length > 0) v.errors.push(`labels missing: ${missing.join(', ')}`)
   if (extra.length > 0) {
@@ -161,11 +162,11 @@ async function checkLinks (
   v: IssueVerification,
 ): Promise<void> {
   if (expected.length === 0) return
-  const refs = (doc[field] as Array<{ _id: Ref }> | undefined) ?? []
+  const refs = (doc as LiveIssue)[field] ?? []
   const idents: string[] = []
   for (const ref of refs) {
-    const t = await client.findOne(tracker.class.Issue, { _id: ref._id })
-    if (t?.['identifier'] != null) idents.push(String(t['identifier']))
+    const t = await client.findOne<LiveIssue>(tracker.class.Issue, { _id: ref._id })
+    if (t?.identifier != null) idents.push(String(t.identifier))
   }
   const { missing } = setDiff(expected, idents)
   if (missing.length > 0) v.errors.push(`${field} missing: ${missing.join(', ')}`)
