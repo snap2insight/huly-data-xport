@@ -28,6 +28,7 @@ project:
         - file: guide/people-templates-multiworkspace.md
         - file: guide/db-migration.md
         - file: guide/api-migration.md
+        - file: guide/local-testing.md
 
     - title: "Design"
       children:

@@ -13,7 +13,7 @@ extends:
 project:
   id: huly-data-xport-docs
   github: https://github.com/snap2insight/huly-data-xport
-  title: "Huly App Migrator"
+  title: "Huly Data Xport"
   description: "Prepare data in Huly's universal format from any source, validate it, import it over WebSocket (no Docker), then verify and report — a reusable TypeScript core with a CLI and more surfaces to come."
   authors:
     - name: huly-data-xport contributors
@@ -46,5 +46,5 @@ project:
 
 site:
   options:
-    logo_text: "Huly App Migrator"
+    logo_text: "Huly Data Xport"
     hover_xref: true
