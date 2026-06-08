@@ -1,0 +1,6 @@
+class: core:class:Enum
+title: RequirementType
+values:
+  - Epic
+  - Feature
+  - Bug-fix

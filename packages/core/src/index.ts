@@ -12,7 +12,7 @@
 //
 // Every surface (CLI, VS Code plugin, CI job) is a thin shell over these.
 
-export const VERSION = '0.1.0'
+export const VERSION = '0.1.1'
 
 export * from './model/index.js'
 export * from './format/index.js'

@@ -1,6 +1,6 @@
 {
   "name": "huly-data-xport",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Bulk import/export + post-import toolkit for Huly — prepare data in the universal format from any source, validate, import, verify, export, and report. Fills gaps the official import-tool leaves (labels, milestones, components, issue links, append-to-existing-project, idempotent re-runs).",
   "license": "Apache-2.0",
