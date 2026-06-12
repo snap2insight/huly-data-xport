@@ -24,3 +24,10 @@ docs/_toolkit
 .DS_Store
 .vscode/
 .idea/
+
+# Private S2I migration scratch files & outputs
+_inbox/
+inspect.js
+list-issues.js
+sync-backlog.js
+all-issues-out.txt
